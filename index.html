@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cena 3D - Projeto</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+      #info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 400px;
+        pointer-events: none;
+      }
+      #controls {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 400px;
+      }
+      .control-group {
+        margin-bottom: 15px;
+      }
+      .slider-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .slider-container label {
+        width: 120px;
+      }
+      .slider-container input {
+        flex-grow: 1;
+      }
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        margin: 5px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2980b9;
+      }
+      .active {
+        background: #e74c3c;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <h2>Projeto: Cena 3D</h2>
+      <p>Use o mouse para rotacionar a câmera (clique e arraste).</p>
+      <p>Use a roda do mouse para zoom.</p>
+    </div>
+
+    <div id="controls">
+      <div class="control-group">
+        <h3>Objeto Selecionado: <span id="selectedObjectName">Nenhum</span></h3>
+        <button id="selectCube">Cubo</button>
+        <button id="selectSphere">Esfera</button>
+        <button id="selectCylinder">Cilindro</button>
+      </div>
+
+      <div class="control-group">
+        <h3>Translação</h3>
+        <div class="slider-container">
+          <label>Posição X:</label>
+          <input type="range" id="posX" min="-5" max="5" step="0.1" value="0" />
+          <span id="posXValue">0</span>
+        </div>
+        <div class="slider-container">
+          <label>Posição Y:</label>
+          <input type="range" id="posY" min="-5" max="5" step="0.1" value="0" />
+          <span id="posYValue">0</span>
+        </div>
+        <div class="slider-container">
+          <label>Posição Z:</label>
+          <input type="range" id="posZ" min="-5" max="5" step="0.1" value="0" />
+          <span id="posZValue">0</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Rotação</h3>
+        <div class="slider-container">
+          <label>Rotação X:</label>
+          <input
+            type="range"
+            id="rotX"
+            min="0"
+            max="6.28"
+            step="0.01"
+            value="0"
+          />
+          <span id="rotXValue">0</span>
+        </div>
+        <div class="slider-container">
+          <label>Rotação Y:</label>
+          <input
+            type="range"
+            id="rotY"
+            min="0"
+            max="6.28"
+            step="0.01"
+            value="0"
+          />
+          <span id="rotYValue">0</span>
+        </div>
+        <div class="slider-container">
+          <label>Rotação Z:</label>
+          <input
+            type="range"
+            id="rotZ"
+            min="0"
+            max="6.28"
+            step="0.01"
+            value="0"
+          />
+          <span id="rotZValue">0</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Escala</h3>
+        <div class="slider-container">
+          <label>Escala:</label>
+          <input
+            type="range"
+            id="scale"
+            min="0.1"
+            max="2"
+            step="0.1"
+            value="1"
+          />
+          <span id="scaleValue">1</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Iluminação</h3>
+        <div class="slider-container">
+          <label>Intensidade:</label>
+          <input
+            type="range"
+            id="lightIntensity"
+            min="0"
+            max="2"
+            step="0.1"
+            value="1"
+          />
+          <span id="lightIntensityValue">1</span>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script>
+      // Como o OrbitControls está dando problema de importação via CDN,
+      // vamos implementar um controle de câmera simples
+      class SimpleOrbitControls {
+        constructor(camera, domElement) {
+          this.camera = camera;
+          this.domElement = domElement;
+          this.target = new THREE.Vector3(0, 0, 0);
+          this.enableDamping = false;
+          this.dampingFactor = 0.05;
+          this.enabled = true;
+
+          this.rotateSpeed = 1.0;
+          this.zoomSpeed = 1.0;
+
+          this.minDistance = 0;
+          this.maxDistance = Infinity;
+
+          this.isMouseDown = false;
+          this.mouseX = 0;
+          this.mouseY = 0;
+
+          // Posição inicial da câmera em coordenadas esféricas
+          this.spherical = new THREE.Spherical().setFromVector3(
+            new THREE.Vector3().subVectors(this.camera.position, this.target)
+          );
+
+          // Event listeners
+          this.domElement.addEventListener(
+            "mousedown",
+            this.onMouseDown.bind(this)
+          );
+          this.domElement.addEventListener(
+            "mousemove",
+            this.onMouseMove.bind(this)
+          );
+          this.domElement.addEventListener(
+            "mouseup",
+            this.onMouseUp.bind(this)
+          );
+          this.domElement.addEventListener(
+            "wheel",
+            this.onMouseWheel.bind(this)
+          );
+        }
+
+        onMouseDown(event) {
+          if (!this.enabled) return;
+          this.isMouseDown = true;
+          this.mouseX = event.clientX;
+          this.mouseY = event.clientY;
+        }
+
+        onMouseMove(event) {
+          if (!this.enabled || !this.isMouseDown) return;
+
+          const deltaX = event.clientX - this.mouseX;
+          const deltaY = event.clientY - this.mouseY;
+
+          this.mouseX = event.clientX;
+          this.mouseY = event.clientY;
+
+          // Atualizar ângulos esféricos
+          this.spherical.theta -= deltaX * 0.01 * this.rotateSpeed;
+          this.spherical.phi = Math.max(
+            0.1,
+            Math.min(
+              Math.PI - 0.1,
+              this.spherical.phi + deltaY * 0.01 * this.rotateSpeed
+            )
+          );
+
+          this.updateCamera();
+        }
+
+        onMouseUp() {
+          this.isMouseDown = false;
+        }
+
+        onMouseWheel(event) {
+          if (!this.enabled) return;
+
+          const delta = -event.deltaY;
+
+          // Ajustar distância
+          this.spherical.radius = Math.max(
+            this.minDistance,
+            Math.min(
+              this.maxDistance,
+              this.spherical.radius - delta * 0.05 * this.zoomSpeed
+            )
+          );
+
+          this.updateCamera();
+
+          event.preventDefault();
+        }
+
+        updateCamera() {
+          // Converter coordenadas esféricas para cartesianas
+          const offset = new THREE.Vector3().setFromSpherical(this.spherical);
+
+          // Definir posição da câmera
+          this.camera.position.copy(this.target).add(offset);
+
+          // Apontar câmera para o alvo
+          this.camera.lookAt(this.target);
+        }
+
+        update() {
+          // Método necessário para manter compatibilidade com o original OrbitControls
+          if (this.enableDamping) {
+            // Implementação de amortecimento (se necessário)
+          }
+        }
+      }
+
+      // Substituir THREE.OrbitControls pelo nosso SimpleOrbitControls
+      THREE.OrbitControls = SimpleOrbitControls;
+    </script>
+
+    <script>
+      // -------------------------------------------------------------
+      // Configuração inicial da cena, câmera e renderizador
+      // -------------------------------------------------------------
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111111);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 10;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      // Controles de órbita (permite rotacionar a câmera em torno da cena)
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // -------------------------------------------------------------
+      // Iluminação
+      // -------------------------------------------------------------
+      // Luz ambiente
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+      scene.add(ambientLight);
+
+      // Luz direcional (simula sol)
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 10, 7);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      // Luz pontual (ilumina de um ponto específico)
+      const pointLight = new THREE.PointLight(0xffffff, 0.5);
+      pointLight.position.set(-5, 5, 5);
+      scene.add(pointLight);
+
+      // -------------------------------------------------------------
+      // Criação de texturas
+      // -------------------------------------------------------------
+      // Criar um padrão de tabuleiro para o cubo
+      function createCheckerboardTexture() {
+        const size = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, size, size);
+
+        const tileSize = size / 8;
+
+        for (let i = 0; i < 8; i++) {
+          for (let j = 0; j < 8; j++) {
+            if ((i + j) % 2 === 0) {
+              context.fillStyle = "#4169E1";
+              context.fillRect(i * tileSize, j * tileSize, tileSize, tileSize);
+            }
+          }
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+      }
+
+      // -------------------------------------------------------------
+      // Criação dos objetos 3D
+      // -------------------------------------------------------------
+      // Criar cubo com textura de tabuleiro
+      const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const checkerboardTexture = createCheckerboardTexture();
+      const cubeMaterial = new THREE.MeshStandardMaterial({
+        map: checkerboardTexture,
+        metalness: 0.2,
+        roughness: 0.7,
+      });
+      const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+      cube.position.x = -3;
+      cube.castShadow = true;
+      cube.receiveShadow = true;
+      cube.name = "Cubo";
+      scene.add(cube);
+
+      // Criar esfera
+      const sphereGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+      const sphereMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff4500, // Laranja avermelhado
+        metalness: 0.5,
+        roughness: 0.2,
+      });
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      sphere.position.x = 0;
+      sphere.castShadow = true;
+      sphere.receiveShadow = true;
+      sphere.name = "Esfera";
+      scene.add(sphere);
+
+      // Criar cilindro
+      const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 2.5, 32);
+      const cylinderMaterial = new THREE.MeshStandardMaterial({
+        color: 0x32cd32, // Verde lima
+        metalness: 0.1,
+        roughness: 0.8,
+      });
+      const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+      cylinder.position.x = 3;
+      cylinder.castShadow = true;
+      cylinder.receiveShadow = true;
+      cylinder.name = "Cilindro";
+      scene.add(cylinder);
+
+      // -------------------------------------------------------------
+      // Adicionar plano base para receber sombras
+      // -------------------------------------------------------------
+      const planeGeometry = new THREE.PlaneGeometry(20, 20);
+      const planeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x808080,
+        side: THREE.DoubleSide,
+      });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = Math.PI / 2;
+      plane.position.y = -3;
+      plane.receiveShadow = true;
+      scene.add(plane);
+
+      // -------------------------------------------------------------
+      // Configuração dos controles de interface
+      // -------------------------------------------------------------
+      let selectedObject = null;
+
+      // Atualizar sliders baseado no objeto selecionado
+      function updateSliders() {
+        if (!selectedObject) return;
+
+        document.getElementById("posX").value = selectedObject.position.x;
+        document.getElementById("posY").value = selectedObject.position.y;
+        document.getElementById("posZ").value = selectedObject.position.z;
+        document.getElementById("posXValue").textContent =
+          selectedObject.position.x.toFixed(1);
+        document.getElementById("posYValue").textContent =
+          selectedObject.position.y.toFixed(1);
+        document.getElementById("posZValue").textContent =
+          selectedObject.position.z.toFixed(1);
+
+        document.getElementById("rotX").value = selectedObject.rotation.x;
+        document.getElementById("rotY").value = selectedObject.rotation.y;
+        document.getElementById("rotZ").value = selectedObject.rotation.z;
+        document.getElementById("rotXValue").textContent =
+          selectedObject.rotation.x.toFixed(2);
+        document.getElementById("rotYValue").textContent =
+          selectedObject.rotation.y.toFixed(2);
+        document.getElementById("rotZValue").textContent =
+          selectedObject.rotation.z.toFixed(2);
+
+        document.getElementById("scale").value = selectedObject.scale.x;
+        document.getElementById("scaleValue").textContent =
+          selectedObject.scale.x.toFixed(1);
+      }
+
+      // Selecionar objeto
+      function selectObject(object) {
+        // Resetar estilo dos botões
+        document.getElementById("selectCube").classList.remove("active");
+        document.getElementById("selectSphere").classList.remove("active");
+        document.getElementById("selectCylinder").classList.remove("active");
+
+        selectedObject = object;
+        document.getElementById("selectedObjectName").textContent =
+          selectedObject.name;
+
+        // Destacar botão do objeto selecionado
+        if (object === cube) {
+          document.getElementById("selectCube").classList.add("active");
+        } else if (object === sphere) {
+          document.getElementById("selectSphere").classList.add("active");
+        } else if (object === cylinder) {
+          document.getElementById("selectCylinder").classList.add("active");
+        }
+
+        updateSliders();
+      }
+
+      // Event listeners para botões de seleção
+      document
+        .getElementById("selectCube")
+        .addEventListener("click", () => selectObject(cube));
+      document
+        .getElementById("selectSphere")
+        .addEventListener("click", () => selectObject(sphere));
+      document
+        .getElementById("selectCylinder")
+        .addEventListener("click", () => selectObject(cylinder));
+
+      // Event listeners para sliders de translação
+      document.getElementById("posX").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.position.x = parseFloat(this.value);
+        document.getElementById("posXValue").textContent = parseFloat(
+          this.value
+        ).toFixed(1);
+      });
+
+      document.getElementById("posY").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.position.y = parseFloat(this.value);
+        document.getElementById("posYValue").textContent = parseFloat(
+          this.value
+        ).toFixed(1);
+      });
+
+      document.getElementById("posZ").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.position.z = parseFloat(this.value);
+        document.getElementById("posZValue").textContent = parseFloat(
+          this.value
+        ).toFixed(1);
+      });
+
+      // Event listeners para sliders de rotação
+      document.getElementById("rotX").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.rotation.x = parseFloat(this.value);
+        document.getElementById("rotXValue").textContent = parseFloat(
+          this.value
+        ).toFixed(2);
+      });
+
+      document.getElementById("rotY").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.rotation.y = parseFloat(this.value);
+        document.getElementById("rotYValue").textContent = parseFloat(
+          this.value
+        ).toFixed(2);
+      });
+
+      document.getElementById("rotZ").addEventListener("input", function () {
+        if (!selectedObject) return;
+        selectedObject.rotation.z = parseFloat(this.value);
+        document.getElementById("rotZValue").textContent = parseFloat(
+          this.value
+        ).toFixed(2);
+      });
+
+      // Event listener para slider de escala
+      document.getElementById("scale").addEventListener("input", function () {
+        if (!selectedObject) return;
+        const scale = parseFloat(this.value);
+        selectedObject.scale.set(scale, scale, scale);
+        document.getElementById("scaleValue").textContent = scale.toFixed(1);
+      });
+
+      // Event listener para intensidade da luz
+      document
+        .getElementById("lightIntensity")
+        .addEventListener("input", function () {
+          const intensity = parseFloat(this.value);
+          directionalLight.intensity = intensity;
+          document.getElementById("lightIntensityValue").textContent =
+            intensity.toFixed(1);
+        });
+
+      // Selecionar cubo por padrão
+      selectObject(cube);
+
+      // -------------------------------------------------------------
+      // Responsividade
+      // -------------------------------------------------------------
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // -------------------------------------------------------------
+      // Loop de animação
+      // -------------------------------------------------------------
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Atualizar controles de órbita
+        controls.update();
+
+        // Renderizar cena
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    </script>
+  </body>
+</html>
