@@ -102,6 +102,12 @@ class SimpleOrbitControls {
 }
 ```
 
+## Capturas de Tela
+
+![Cena 3D com objetos em suas posições iniciais](./2025-05-06%20231957.png)
+
+*Imagem 1: Visão geral da cena 3D com os três objetos (cubo texturizado, esfera laranja e cilindro verde) e controles de interface.*
+
 ## Conclusão
 
 A implementação atende todos os requisitos do projeto, incluindo os três objetos 3D, transformações, iluminação e controle de câmera. A adição de textura ao cubo demonstra técnicas avançadas de renderização 3D, e a interface de usuário intuitiva facilita a interação com a cena.
